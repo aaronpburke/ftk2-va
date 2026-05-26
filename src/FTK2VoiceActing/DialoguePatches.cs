@@ -66,6 +66,7 @@ namespace FTK2VoiceActing
         /// </summary>
         internal static void RenderEmitterPrefix(string pValue, bool pDoTranslate)
         {
+            Plugin.Log?.LogInfo($"[Dialogue] RenderEmitterPrefix: pValue='{pValue}', pDoTranslate={pDoTranslate}");
             if (!string.IsNullOrEmpty(pValue))
             {
                 // When pDoTranslate is true, pValue is the raw NPC ID (e.g., "NPC_BARMAID")
@@ -84,6 +85,8 @@ namespace FTK2VoiceActing
         /// </summary>
         internal static void RenderSayPrefix(string pValue, bool pDoTranslate)
         {
+            Plugin.Log?.LogInfo($"[Dialogue] RenderSayPrefix: pValue='{pValue?.Substring(0, System.Math.Min(pValue?.Length ?? 0, 50))}', pDoTranslate={pDoTranslate}, emitter='{CurrentEmitter}'");
+
             if (VoiceManager == null || string.IsNullOrEmpty(pValue))
                 return;
 

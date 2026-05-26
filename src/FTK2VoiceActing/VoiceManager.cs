@@ -211,8 +211,11 @@ namespace FTK2VoiceActing
 
             operation.completed += _ =>
             {
+                _logger.LogInfo($"Audio load completed for {filePath}, generation match: {_handle.IsCurrentGeneration(playbackGeneration)}");
+
                 if (!_handle.IsCurrentGeneration(playbackGeneration))
                 {
+                    _logger.LogWarning($"Generation mismatch for {filePath} (requested={playbackGeneration}, current={_handle.Generation})");
                     request.Dispose();
                     return;
                 }
@@ -233,16 +236,17 @@ namespace FTK2VoiceActing
                 }
 
                 clip.name = Path.GetFileNameWithoutExtension(filePath);
+                _logger.LogInfo($"Playing clip '{clip.name}', handle ready={_handle.IsReady}, volume={_config.GetVolume():F2}");
                 if (!_handle.Play(clip, _config.GetVolume(), playbackGeneration))
                 {
+                    _logger.LogWarning($"Handle.Play returned false for {filePath}");
                     // Generation changed while we were processing — destroy the orphan clip
                     UnityEngine.Object.Destroy(clip);
                     request.Dispose();
                     return;
                 }
 
-                if (_config.DebugLogging.Value)
-                    _logger.LogDebug($"Playing voice clip: {filePath} (volume: {_config.GetVolume():F2})");
+                _logger.LogInfo($"Voice clip playing: {filePath}");
 
                 request.Dispose();
             };
