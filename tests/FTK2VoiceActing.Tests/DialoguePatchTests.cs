@@ -96,7 +96,7 @@ namespace FTK2VoiceActing.Tests
         }
 
         [Test]
-        public void RenderSayPrefix_NoPlayback_WhenNoMatchFound()
+        public void RenderSayPrefix_StopsButNoPlayback_WhenNoMatchFound()
         {
             var playback = new FakeVoicePlayback();
             DialoguePatches.VoiceManager = playback;
@@ -105,6 +105,7 @@ namespace FTK2VoiceActing.Tests
             DialoguePatches.RenderSayPrefix("Unknown text", pDoTranslate: true);
 
             Assert.AreEqual(0, playback.PlayCalls);
+            Assert.AreEqual(1, playback.StopCalls, "Should stop current clip even when no match");
         }
 
         [Test]

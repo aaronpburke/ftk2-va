@@ -91,6 +91,10 @@ namespace FTK2VoiceActing
             if (VoiceManager == null || string.IsNullOrEmpty(pValue))
                 return;
 
+            // Always stop the current clip when a new SAY line appears,
+            // even if we don't have a voice file for this line.
+            VoiceManager.StopCurrentClip();
+
             string emitter = CurrentEmitter;
             if (string.IsNullOrEmpty(emitter))
                 return;
@@ -113,9 +117,6 @@ namespace FTK2VoiceActing
                 VoiceManager.PlayVoiceClip(emitter, matchedKey);
                 return;
             }
-
-            if (Plugin.Log != null)
-                Plugin.Log.LogDebug($"[Dialogue] No voice clip match for {emitter}, text='{pValue?.Substring(0, System.Math.Min(pValue?.Length ?? 0, 50))}'");
         }
 
         /// <summary>
