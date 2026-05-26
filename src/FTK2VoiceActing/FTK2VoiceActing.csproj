@@ -14,20 +14,31 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
+    <PackageReference Include="BepInEx.Core" Version="5.*" />
+    <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
+  </ItemGroup>
+
   <!--
     External assembly references.
     These must be manually placed in the ../../lib/ folder.
     See ../../lib/README.md for instructions.
+
+	Note: The "Private" metadata is set to false for these references to 
+	prevent them from being copied to the output directory.
   -->
   <ItemGroup>
-    <Reference Include="BepInEx">
-      <HintPath>..\..\lib\BepInEx.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="0Harmony">
-      <HintPath>..\..\lib\0Harmony.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+	<!-- 
+	  Base game assemblies (from the game installation directory)
+	-->
+	<Reference Include="FTK2">
+	  <HintPath>..\..\lib\FTK2.dll</HintPath>
+	  <Private>false</Private>
+	</Reference>
+	<!-- 
+	  Unity assemblies (also from the game installation directory)
+	-->
     <Reference Include="UnityEngine">
       <HintPath>..\..\lib\UnityEngine.dll</HintPath>
       <Private>false</Private>
@@ -50,10 +61,6 @@
     </Reference>
     <Reference Include="UnityEngine.UnityWebRequestModule">
       <HintPath>..\..\lib\UnityEngine.UnityWebRequestModule.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="FTK2">
-      <HintPath>..\..\lib\FTK2.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
