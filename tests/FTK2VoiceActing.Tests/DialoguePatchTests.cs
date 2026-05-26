@@ -66,9 +66,10 @@ namespace FTK2VoiceActing.Tests
         }
 
         [Test]
-        public void RenderSayPrefix_PlaysVoice_WhenEmitterAndTranslationKeyAreAvailable()
+        public void RenderSayPrefix_PlaysVoice_WhenDirectKeyMatch()
         {
             var playback = new FakeVoicePlayback();
+            playback.AddClip("NPC_BARMAID", "DIALOG_KEY");
             DialoguePatches.VoiceManager = playback;
             DialoguePatches.CurrentEmitter = "NPC_BARMAID";
 
@@ -77,6 +78,33 @@ namespace FTK2VoiceActing.Tests
             Assert.AreEqual(1, playback.PlayCalls);
             Assert.AreEqual("NPC_BARMAID", playback.LastNpcId);
             Assert.AreEqual("DIALOG_KEY", playback.LastDialogueKey);
+        }
+
+        [Test]
+        public void RenderSayPrefix_PlaysVoice_WhenReverseTranslationMatch()
+        {
+            var playback = new FakeVoicePlayback();
+            playback.AddTranslation("NPC_BARMAID", "My, we haven't seen many adventurers", "STORY_1_1_DIALOG_1");
+            DialoguePatches.VoiceManager = playback;
+            DialoguePatches.CurrentEmitter = "NPC_BARMAID";
+
+            DialoguePatches.RenderSayPrefix("My, we haven't seen many adventurers", pDoTranslate: true);
+
+            Assert.AreEqual(1, playback.PlayCalls);
+            Assert.AreEqual("NPC_BARMAID", playback.LastNpcId);
+            Assert.AreEqual("STORY_1_1_DIALOG_1", playback.LastDialogueKey);
+        }
+
+        [Test]
+        public void RenderSayPrefix_NoPlayback_WhenNoMatchFound()
+        {
+            var playback = new FakeVoicePlayback();
+            DialoguePatches.VoiceManager = playback;
+            DialoguePatches.CurrentEmitter = "NPC_BARMAID";
+
+            DialoguePatches.RenderSayPrefix("Unknown text", pDoTranslate: true);
+
+            Assert.AreEqual(0, playback.PlayCalls);
         }
 
         [Test]

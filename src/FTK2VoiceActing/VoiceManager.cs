@@ -12,6 +12,8 @@ namespace FTK2VoiceActing
     {
         void PlayVoiceClip(string npcId, string dialogueKey);
         void StopCurrentClip();
+        bool HasVoiceClip(string npcId, string dialogueKey);
+        string FindKeyByTranslatedText(string npcId, string translatedText);
     }
 
     /// <summary>
@@ -122,6 +124,38 @@ namespace FTK2VoiceActing
 
             if (_voiceFileIndex.TryGetValue((npcId, dialogueKey), out string path))
                 return path;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Finds a dialogue key for the given NPC by matching translated text
+        /// against the game's localization system. The game pre-translates SAY
+        /// values before they reach RenderSay, so we reverse-lookup by calling
+        /// Lang.__dt() on each indexed key for this NPC.
+        /// Returns the matching dialogue key, or null if not found.
+        /// </summary>
+        public string FindKeyByTranslatedText(string npcId, string translatedText)
+        {
+            if (string.IsNullOrEmpty(npcId) || string.IsNullOrEmpty(translatedText))
+                return null;
+
+            foreach (var kvp in _voiceFileIndex)
+            {
+                if (!string.Equals(kvp.Key.npcId, npcId, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                try
+                {
+                    string translated = Lang.__dt(kvp.Key.dialogueKey);
+                    if (string.Equals(translated, translatedText, StringComparison.OrdinalIgnoreCase))
+                        return kvp.Key.dialogueKey;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning($"Lang.__dt failed for key '{kvp.Key.dialogueKey}': {ex.Message}");
+                }
+            }
 
             return null;
         }

@@ -82,24 +82,41 @@ namespace FTK2VoiceActing
         /// <summary>
         /// Prefix patch for DialogueViewHelper.RenderSay.
         /// Plays the matching voice clip when a dialogue line is displayed.
+        /// The game pre-translates SAY values before they reach RenderSay,
+        /// so pValue may be translated text even when pDoTranslate is true.
+        /// We first try a direct key match, then fall back to reverse-lookup
+        /// through the game's localization system.
         /// </summary>
         internal static void RenderSayPrefix(string pValue, bool pDoTranslate)
         {
-            Plugin.Log?.LogInfo($"[Dialogue] RenderSayPrefix: pValue='{pValue?.Substring(0, System.Math.Min(pValue?.Length ?? 0, 50))}', pDoTranslate={pDoTranslate}, emitter='{CurrentEmitter}'");
-
             if (VoiceManager == null || string.IsNullOrEmpty(pValue))
-                return;
-
-            // When pDoTranslate is true, pValue is the translation key (e.g., "STORY_1_1_VISIT_PRAN_PRE_DIALOG_1")
-            // When pDoTranslate is false, pValue is already-resolved text — we can't match it to a file
-            if (!pDoTranslate)
                 return;
 
             string emitter = CurrentEmitter;
             if (string.IsNullOrEmpty(emitter))
                 return;
 
-            VoiceManager.PlayVoiceClip(emitter, pValue);
+            // Try direct match first (pValue might be a raw dialogue key)
+            if (VoiceManager.HasVoiceClip(emitter, pValue))
+            {
+                Plugin.Log?.LogInfo($"[Dialogue] Direct key match: {emitter}/{pValue}");
+                VoiceManager.PlayVoiceClip(emitter, pValue);
+                return;
+            }
+
+            // The game pre-translates SAY values in the dialogue JSON before
+            // they reach RenderSay, so pValue is typically the translated text.
+            // Reverse-lookup through the game's localization to find the key.
+            string matchedKey = VoiceManager.FindKeyByTranslatedText(emitter, pValue);
+            if (matchedKey != null)
+            {
+                Plugin.Log?.LogInfo($"[Dialogue] Reverse translation match: {emitter}/{matchedKey}");
+                VoiceManager.PlayVoiceClip(emitter, matchedKey);
+                return;
+            }
+
+            if (Plugin.Log != null)
+                Plugin.Log.LogDebug($"[Dialogue] No voice clip match for {emitter}, text='{pValue?.Substring(0, System.Math.Min(pValue?.Length ?? 0, 50))}'");
         }
 
         /// <summary>
