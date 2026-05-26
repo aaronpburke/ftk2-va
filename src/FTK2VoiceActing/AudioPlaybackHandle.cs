@@ -116,7 +116,8 @@ namespace FTK2VoiceActing
         /// </summary>
         protected virtual void DestroyUnityObjects()
         {
-            Object.Destroy(_gameObject);
+            if (_gameObject != null)
+                Object.Destroy(_gameObject);
         }
 
         /// <summary>
@@ -125,6 +126,12 @@ namespace FTK2VoiceActing
         /// </summary>
         protected virtual void StopUnityPlayback()
         {
+            // Unity may destroy the underlying GameObject/AudioSource during
+            // scene transitions even if _created is still true. Guard against
+            // accessing a destroyed native object.
+            if (_source == null)
+                return;
+
             if (_source.isPlaying)
                 _source.Stop();
 
@@ -141,6 +148,9 @@ namespace FTK2VoiceActing
         /// </summary>
         protected virtual void PlayUnityClip(AudioClip clip, float volume)
         {
+            if (_source == null)
+                return;
+
             _source.clip = clip;
             _source.volume = volume;
             _source.Play();
@@ -152,7 +162,7 @@ namespace FTK2VoiceActing
         /// </summary>
         protected virtual bool GetIsPlaying()
         {
-            return _source.isPlaying;
+            return _source != null && _source.isPlaying;
         }
     }
 }
