@@ -50,7 +50,7 @@ Plugin.cs (BepInEx entry)
 
 ## Critical Game Behavior (Learned the Hard Way)
 
-### 1. SAY values arrive pre-translated at runtime (despite what the decompiled source suggests)
+### 1. SAY values may arrive pre-translated at runtime
 
 **Decompiled source** shows `GameplayDirectorBase.ParseDialogueAction()` passing raw JSON strings to `RenderSay`, and `DialogueViewHelper.RenderSay()` calling `Lang.__dt(pValue)` internally when `pDoTranslate=true`. This suggests the Harmony prefix should see raw dialogue keys.
 
@@ -60,7 +60,9 @@ Plugin.cs (BepInEx entry)
 
 The mod handles both scenarios with a two-step lookup in `RenderSayPrefix`:
 1. Try direct key match (`HasVoiceClip(emitter, pValue)`) — works if pValue is a raw dialogue key
-2. Reverse-lookup via `VoiceManager.FindKeyByTranslatedText()` which calls `Lang.__dt(key)` on each indexed key for the NPC and compares the result to the received text
+2. Reverse-lookup via `VoiceManager.FindKeyByTranslatedText()` which calls `Lang.__dt(key)` on each indexed key for the NPC and compares the result to the received text (linear scan, case-insensitive, no normalization beyond `OrdinalIgnoreCase`)
+
+Note: `RenderSayPrefix` does **not** branch on `pDoTranslate` — it always tries both paths regardless. This makes it resilient to whichever value the game sends.
 
 **Important:** If you investigate this further, check the runtime logs — don't trust the decompiled source alone for the SAY path. The two-step lookup exists precisely because both paths are possible.
 
@@ -74,11 +76,17 @@ Unity calls `OnDestroy` on `MonoBehaviour` instances attached to `DontDestroyOnL
 - `StopUnityPlayback()` and `PlayUnityClip()` have `if (_source == null) return;` guards
 - The `_created` flag tracks logical state; `IsUnityObjectDestroyed()` checks actual native object liveness
 
-### 3. RenderSay must always stop the previous clip
+### 3. RenderSay must stop the previous clip
 
-When the player advances dialogue, `RenderSayPrefix` fires for the next line. If no voice file exists for that line, the previous clip must still be stopped. The stop call is at the **top** of `RenderSayPrefix`, before any key matching.
+When the player advances dialogue, `RenderSayPrefix` fires for the next line. If no voice file exists for that line, the previous clip must still be stopped. The stop call is near the top of `RenderSayPrefix`, after the null/empty `pValue` early return but before any key matching.
 
-### 4. LoadAndPlayClip must not check IsReady
+**Edge case:** If `pValue` is null or empty, the method returns early without stopping. This is acceptable since the game wouldn't display meaningful dialogue in that case.
+
+### 4. CurrentEmitter can go stale
+
+`CurrentEmitter` is only updated when `RenderEmitter` is called with `pDoTranslate=true` (raw NPC IDs). `REFLECTION_*` emitters arrive with `pDoTranslate=false` and are ignored, leaving the previous emitter cached. This means if a reflection-type emitter speaks, the mod would attempt to match against the previous NPC's voice files. This is an accepted limitation — reflection emitters are rare and don't have dedicated voice files.
+
+### 5. LoadAndPlayClip must not check IsReady
 
 `Play()` auto-recreates Unity objects via `EnsureCreated()`. An `IsReady` check before the async load would incorrectly bail out because `IsReady` detects destroyed objects. The guard was removed — let `Play()` handle it.
 
@@ -141,7 +149,7 @@ The plugin auto-discovers its own directory via `Path.GetDirectoryName(Info.Loca
 - When `Enabled=false`, `PlayVoiceClip()` still calls `StopCurrentClip()` to immediately silence current playback and invalidate any in-flight async load that started while enabled
 - Async load callbacks always dispose their `UnityWebRequest` on every code path
 - Stale-generation clips (where dialogue advanced during loading) are explicitly destroyed to avoid leaking orphan `AudioClip` instances
-- `RenderSayPrefix` calls `StopCurrentClip()` unconditionally, then `PlayVoiceClip()` calls it again if a match is found — the double-stop is harmless (second is a no-op) and ensures correctness
+- `RenderSayPrefix` calls `StopCurrentClip()`, then `PlayVoiceClip()` calls it again if a match is found — the second stop increments the generation counter again but is functionally harmless since no clip is playing between the two calls
 
 ## Common Pitfalls
 
@@ -149,7 +157,7 @@ The plugin auto-discovers its own directory via `Path.GetDirectoryName(Info.Loca
 2. **Don't use `clip == null`** in test code — use `ReferenceEquals(clip, null)` to avoid Unity native calls
 3. **Don't clean up in `OnDestroy` without a quit guard** — Unity fires it during scene transitions
 4. **Don't assume `_created` means objects are alive** — always check via `IsUnityObjectDestroyed()`
-5. **Don't forget to stop audio on SAY** — every `RenderSayPrefix` must stop the previous clip unconditionally
+5. **Don't forget to stop audio on SAY** — `RenderSayPrefix` must stop the previous clip before key matching (after null check)
 6. **Don't commit files to `VoiceAssets_Template/`** — `.gitignore` excludes `.ogg`, `.wav`, and generated CSVs
 7. **Don't add direct project references to the game source** — game types come from `lib/*.dll`; BepInEx comes from NuGet
 
@@ -157,15 +165,22 @@ The plugin auto-discovers its own directory via `Path.GetDirectoryName(Info.Loca
 
 If you have access to the decompiled game source:
 
+### Game API (stable references)
+
 | File | What it tells you |
 |---|---|
 | `GameplayDirectorBase.cs` (line ~1965) | `ParseDialogueAction` dispatcher — how SAY/EMITTER reach `RenderSay`/`RenderEmitter` |
 | `DialogueViewHelper.cs` | `RenderSay`, `RenderEmitter`, `Deinitialize` signatures |
 | `LoadingScreenViewHelper.cs` | `Initialize(string, VisualElement)`, `Hide(Action)` signatures |
 | `Lang.cs` | `__t()` (translate), `__dt()` (dialogue translate) — used for reverse lookup |
-| `StreamingAssets/Assets/Configs/JSON~/Dialogues/` | 652 dialogue JSON files |
-| `DialogueLangs/en.json` | 1,337 dialogue translation keys |
-| `Langs/en.json` | 9,630 general translation keys |
+
+### Game content (counts may change with updates)
+
+| Path | Approximate count |
+|---|---|
+| `StreamingAssets/Assets/Configs/JSON~/Dialogues/` | ~652 dialogue JSON files |
+| `DialogueLangs/en.json` | ~1,337 dialogue translation keys |
+| `Langs/en.json` | ~9,630 general translation keys |
 
 ## Build / Test / Deploy Cycle
 

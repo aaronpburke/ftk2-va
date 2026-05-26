@@ -163,8 +163,8 @@ These notes document the game systems this mod interacts with, derived from the 
 - English text in `DialogueLangs/en.json` (1,337 keys)
 - EMITTER always precedes SAY in the same action step
 - `DialogueViewHelper.RenderSay(pValue, pDoTranslate)`:
-  - The game pre-translates SAY values in the dialogue JSON before they reach `RenderSay`, so `pValue` is typically the translated English text even when `pDoTranslate=true`
-  - The mod first tries a direct key match, then reverse-lookups through `Lang.__dt()` to find the original dialogue key from the translated text
+  - At runtime, `pValue` has been observed as already-translated English text even when `pDoTranslate=true`. The decompiled source suggests `pValue` should be a raw key, but runtime logs contradict this — the game may pre-translate through a different code path.
+  - The mod handles both: tries a direct key match first, then reverse-lookups through `Lang.__dt()` to find the original dialogue key from the translated text
   - EMITTER values are NOT translated — `pValue` is the raw NPC ID (e.g., `NPC_BARMAID`)
 
 ### Loading Screen
