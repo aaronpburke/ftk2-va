@@ -148,12 +148,12 @@ namespace FTK2VoiceActing
                 if (!_warnedMissingKeys.Contains((npcId, dialogueKey)))
                 {
                     _warnedMissingKeys.Add((npcId, dialogueKey));
-                    if (_config.DebugLogging.Value)
-                        _logger.LogDebug($"No voice clip for {npcId}/{dialogueKey}");
+                    _logger.LogDebug($"No voice clip for {npcId}/{dialogueKey}");
                 }
                 return;
             }
 
+            _logger.LogInfo($"Loading voice clip: {npcId}/{dialogueKey} -> {filePath}");
             LoadAndPlayClip(filePath, _handle.Generation);
         }
 

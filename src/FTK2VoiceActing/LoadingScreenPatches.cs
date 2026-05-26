@@ -45,6 +45,8 @@ namespace FTK2VoiceActing
 
             harmony.Patch(initializeOriginal, postfix: new HarmonyMethod(initPostfix));
             harmony.Patch(hideOriginal, prefix: new HarmonyMethod(hidePrefix));
+
+            Plugin.Log?.LogInfo($"[LoadingScreen] Patches applied: Initialize={initializeOriginal.Name}, Hide={hideOriginal.Name}");
         }
 
         /// <summary>
@@ -55,10 +57,13 @@ namespace FTK2VoiceActing
         /// </summary>
         internal static void InitializePostfix(string pAdventureID)
         {
+            Plugin.Log?.LogInfo($"[LoadingScreen] InitializePostfix called with adventureID: '{pAdventureID}'");
+
             if (VoiceManager == null || string.IsNullOrEmpty(pAdventureID))
                 return;
 
             string dialogueKey = GetNarratorKey(pAdventureID);
+            Plugin.Log?.LogInfo($"[LoadingScreen] Playing narrator clip: {NarratorNpcId}/{dialogueKey}");
             VoiceManager.PlayVoiceClip(NarratorNpcId, dialogueKey);
         }
 
@@ -68,6 +73,7 @@ namespace FTK2VoiceActing
         /// </summary>
         internal static void HidePrefix()
         {
+            Plugin.Log?.LogInfo("[LoadingScreen] HidePrefix called");
             VoiceManager?.StopCurrentClip();
         }
 

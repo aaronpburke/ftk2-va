@@ -56,6 +56,8 @@ namespace FTK2VoiceActing
             harmony.Patch(renderEmitterOriginal, prefix: new HarmonyMethod(emitterPrefix));
             harmony.Patch(renderSayOriginal, prefix: new HarmonyMethod(sayPrefix));
             harmony.Patch(deinitializeOriginal, prefix: new HarmonyMethod(deinitPrefix));
+
+            Plugin.Log?.LogInfo($"[Dialogue] Patches applied: RenderEmitter, RenderSay, Deinitialize");
         }
 
         /// <summary>
