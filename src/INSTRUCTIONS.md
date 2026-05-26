@@ -6,7 +6,7 @@ This is a BepInEx 5 plugin for **For the King 2** that adds voice acting support
 
 ## Requirements
 
-- [.NET SDK 6.0+](https://dotnet.microsoft.com/download) (for building)
+- [.NET 8 SDK](https://dotnet.microsoft.com/download) (required for the test project; the plugin itself targets `netstandard2.1`)
 - [Python 3.6+](https://www.python.org/downloads/) (for the dialogue extraction tool only)
 - For the King 2 installed (any platform — Steam, GOG, Epic, etc.; needed for game assembly references)
 - BepInEx 5.4.x installed in the game
@@ -143,14 +143,16 @@ DialogueViewHelper.Deinitialize()
 
 ### External Dependencies
 
-All external dependencies are consumed from the `lib/` folder as reference-only assemblies (`Private=false` in the .csproj). They are **not** included in the build output since they're already present at runtime in the game's directory.
+The **source project** gets BepInEx from NuGet (via `nuget.config` with the BepInEx feed). All other dependencies (Unity engine and game assemblies) are consumed from the `lib/` folder as reference-only assemblies (`Private=false` in the .csproj) — they are **not** included in the build output since they're already present at runtime.
 
-| Assembly | Source |
-|---|---|
-| `BepInEx.dll` | BepInEx 5.4.x |
-| `0Harmony.dll` | BepInEx (bundled HarmonyX) |
-| `UnityEngine*.dll` | Game's `Managed/` folder |
-| `FTK2.dll` | Game's `Managed/` folder |
+The **test project** references `BepInEx.dll` and `0Harmony.dll` from `lib/` with `Private=true` (copied for the test runner), plus select Unity DLLs.
+
+| Assembly | Source | Used by |
+|---|---|---|
+| `BepInEx.Core` (NuGet) | NuGet feed (`nuget.bepinex.dev`) | Source project |
+| `BepInEx.dll`, `0Harmony.dll` | `lib/` (copied from game's BepInEx) | Test project |
+| `UnityEngine*.dll` | `lib/` (from game's `Managed/` folder) | Both |
+| `FTK2.dll` | `lib/` (from game's `Managed/` folder) | Both |
 
 ## Game Analysis Notes
 

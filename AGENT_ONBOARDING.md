@@ -34,6 +34,8 @@ The source project references game DLLs as `Private=false` (not copied to output
 ```
 Plugin.cs (BepInEx entry)
   ├── VoiceConfig.cs          — ConfigEntry wrappers (Enabled, Volume, DebugLogging)
+  │                              Note: DebugLogging only gates scan/index diagnostics in VoiceManager;
+  │                              other LogDebug calls (patch tracing, playback events) are unconditional
   ├── VoiceManager.cs         — File index, async audio loading, playback
   │     └── AudioPlaybackHandle.cs — Unity AudioSource lifecycle + generation counter
   ├── DialoguePatches.cs      — Harmony patches: RenderEmitter, RenderSay, Deinitialize
@@ -146,6 +148,7 @@ The plugin auto-discovers its own directory via `Path.GetDirectoryName(Info.Loca
 
 ## Runtime Behavior Notes
 
+- **All voice playback is single-channel and mutually exclusive.** Narrator and dialogue share one `VoiceManager` instance (and one `AudioPlaybackHandle`). Starting any new clip — dialogue, narrator, or loading screen — stops whatever is currently playing.
 - When `Enabled=false`, `PlayVoiceClip()` still calls `StopCurrentClip()` to immediately silence current playback and invalidate any in-flight async load that started while enabled
 - Async load callbacks always dispose their `UnityWebRequest` on every code path
 - Stale-generation clips (where dialogue advanced during loading) are explicitly destroyed to avoid leaking orphan `AudioClip` instances

@@ -3,6 +3,8 @@
 This folder must contain the following DLLs before building the project.
 These are **not** distributed with the mod source code — you must copy them from your local game installation.
 
+> **Note:** The source project gets BepInEx from NuGet (via `nuget.config`). The BepInEx DLLs below are needed only for the **test project** (which references them with `Private=true` for the test runner).
+
 ## From BepInEx (`<game>/BepInEx/core/`)
 
 | File | Purpose |
