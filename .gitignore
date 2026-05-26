@@ -16,3 +16,9 @@ lib/*.dll
 ## OS files
 Thumbs.db
 .DS_Store
+
+## Voice assets (user-provided, not tracked)
+VoiceAssets_Template/**/*.ogg
+VoiceAssets_Template/**/*.wav
+VoiceAssets_Template/dialogue_lines.csv
+tools/VoiceAssets

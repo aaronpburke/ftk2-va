@@ -81,13 +81,16 @@ FTK2VoiceActing/
 │   ├── Plugin.cs                    #   BepInEx entry point
 │   ├── VoiceConfig.cs               #   BepInEx configuration wrapper
 │   ├── VoiceManager.cs              #   Audio file discovery & playback
+│   ├── AudioPlaybackHandle.cs       #   Unity AudioSource lifecycle wrapper
 │   ├── DialoguePatches.cs           #   Harmony patches for NPC dialogue
 │   └── LoadingScreenPatches.cs      #   Harmony patches for narrator
 │
 ├── tests/FTK2VoiceActing.Tests/     # NUnit test project
 │   ├── FTK2VoiceActing.Tests.csproj #   Test project file (net8.0)
 │   ├── VoiceManagerTests.cs         #   File discovery, paths, edge cases
-│   ├── DialoguePatchTests.cs        #   Emitter tracking, state machine
+│   ├── AudioPlaybackHandleTests.cs  #   Audio lifecycle, generation counter
+│   ├── DialoguePatchTests.cs        #   Emitter tracking, key matching
+│   ├── FakeVoicePlayback.cs         #   Test double for IVoicePlayback
 │   ├── LoadingScreenPatchTests.cs   #   Narrator key logic
 │   └── VoiceConfigTests.cs          #   Config defaults, clamping
 │
@@ -108,11 +111,13 @@ Game dialogue system                         Mod hooks
 
 ParseDialogueAction("EMITTER", "NPC_BARMAID")
   └─> DialogueViewHelper.RenderEmitter()  ──> [Prefix] Store NPC ID
-  
-ParseDialogueAction("SAY", "STORY_1_1_..._1")
-  └─> DialogueViewHelper.RenderSay()      ──> [Prefix] Look up audio file
+
+ParseDialogueAction("SAY", <translated text>)
+  └─> DialogueViewHelper.RenderSay()      ──> [Prefix] Stop any playing clip
+                                                └─> Try direct key match
+                                                └─> Reverse-lookup via Lang.__dt()
                                                 └─> VoiceManager.PlayVoiceClip()
-                                                     └─> Load .ogg/.wav
+                                                     └─> Load .ogg/.wav async
                                                      └─> AudioSource.Play()
 
 LoadingScreenViewHelper.Initialize("STORY_1_1")
@@ -131,8 +136,9 @@ DialogueViewHelper.Deinitialize()
 |---|---|
 | `Plugin` | BepInEx entry point. Initializes config, VoiceManager, applies patches. |
 | `VoiceConfig` | Wraps BepInEx `ConfigEntry` for volume, enable, debug logging. |
-| `VoiceManager` | Scans `VoiceAssets/` directory, builds file index, loads and plays `AudioClip`s via `UnityWebRequestMultimedia`. |
-| `DialoguePatches` | Harmony prefix patches on `RenderEmitter` (tracks speaker), `RenderSay` (triggers playback), and `Deinitialize` (stops dialogue audio). |
+| `VoiceManager` | Scans `VoiceAssets/` directory, builds file index, loads and plays `AudioClip`s via `UnityWebRequestMultimedia`. Reverse-lookups translated text via `Lang.__dt()`. |
+| `AudioPlaybackHandle` | Encapsulates Unity `AudioSource`/`GameObject` lifecycle with generation counter for async safety. Auto-recreates objects if Unity destroys them during scene transitions. |
+| `DialoguePatches` | Harmony prefix patches on `RenderEmitter` (tracks speaker), `RenderSay` (stops previous clip, triggers playback via direct or reverse-translation match), and `Deinitialize` (stops dialogue audio). |
 | `LoadingScreenPatches` | Harmony postfix on `Initialize` (starts narrator) and prefix on `Hide` (stops narrator). |
 
 ### External Dependencies
@@ -157,8 +163,9 @@ These notes document the game systems this mod interacts with, derived from the 
 - English text in `DialogueLangs/en.json` (1,337 keys)
 - EMITTER always precedes SAY in the same action step
 - `DialogueViewHelper.RenderSay(pValue, pDoTranslate)`:
-  - When `pDoTranslate=true`: `pValue` is the translation key (what we use)
-  - When `pDoTranslate=false`: `pValue` is already-resolved text (we skip)
+  - The game pre-translates SAY values in the dialogue JSON before they reach `RenderSay`, so `pValue` is typically the translated English text even when `pDoTranslate=true`
+  - The mod first tries a direct key match, then reverse-lookups through `Lang.__dt()` to find the original dialogue key from the translated text
+  - EMITTER values are NOT translated — `pValue` is the raw NPC ID (e.g., `NPC_BARMAID`)
 
 ### Loading Screen
 

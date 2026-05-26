@@ -130,7 +130,13 @@ VoiceAssets/NPC_BARMAID/STORY_1_1_VISIT_PRAN_PRE_DIALOG_1.wav
 2. Search the log for `FTK2 Voice Acting` — you should see:
    ```
    [Info   :FTK2 Voice Acting] FTK2 Voice Acting v1.0.0 loading...
+   [Info   :FTK2 Voice Acting] Indexed X voice files from ...
    [Info   :FTK2 Voice Acting] FTK2 Voice Acting loaded. X voice files indexed.
+   ```
+   When a clip plays, you'll also see:
+   ```
+   [Info   :FTK2 Voice Acting] Loading voice clip: NPC_BARMAID/STORY_1_1_... -> ...
+   [Info   :FTK2 Voice Acting] Voice clip playing: ...
    ```
 3. If it says `0 voice files indexed`, check that your `VoiceAssets` folder is in the right location.
 4. Enable `DebugLogging = true` in the config to see detailed file lookup messages.

@@ -131,7 +131,7 @@ VoiceAssets/
 4. Check the BepInEx log for any issues:
    - Open `<game folder>/BepInEx/LogOutput.log`
    - Search for `FTK2 Voice Acting`
-   - Look for messages like `Playing voice clip: ...` (requires `DebugLogging = true`)
+   - Look for messages like `Loading voice clip: ...` and `Voice clip playing: ...`
 
 ### Testing Tips
 
