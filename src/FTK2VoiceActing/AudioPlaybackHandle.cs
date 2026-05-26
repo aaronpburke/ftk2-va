@@ -16,13 +16,15 @@ namespace FTK2VoiceActing
 
         /// <summary>
         /// Whether the audio source has been created and is ready for playback.
+        /// Checks that the underlying Unity objects are still alive, since Unity
+        /// may destroy DontDestroyOnLoad objects during scene transitions.
         /// </summary>
-        public bool IsReady => _created;
+        public bool IsReady => _created && !IsUnityObjectDestroyed();
 
         /// <summary>
         /// Whether audio is currently playing.
         /// </summary>
-        public bool IsPlaying => _created && GetIsPlaying();
+        public bool IsPlaying => _created && !IsUnityObjectDestroyed() && GetIsPlaying();
 
         /// <summary>
         /// The current playback generation. Incremented on every Stop/Destroy.
@@ -60,11 +62,19 @@ namespace FTK2VoiceActing
         /// provided generation matches the current generation (i.e., no newer
         /// Stop has been issued since this playback was requested) and the clip
         /// is valid.
+        /// Automatically recreates the underlying Unity objects if they were
+        /// destroyed during a scene transition.
         /// Returns true if playback started.
         /// </summary>
         public bool Play(AudioClip clip, float volume, int requestGeneration)
         {
-            if (!_created || ReferenceEquals(clip, null) || requestGeneration != _generation)
+            if (ReferenceEquals(clip, null) || requestGeneration != _generation)
+                return false;
+
+            // Recreate Unity objects if they were destroyed during scene transitions
+            EnsureCreated();
+
+            if (!_created)
                 return false;
 
             PlayUnityClip(clip, volume);
@@ -163,6 +173,39 @@ namespace FTK2VoiceActing
         protected virtual bool GetIsPlaying()
         {
             return _source != null && _source.isPlaying;
+        }
+
+        /// <summary>
+        /// Checks whether the underlying Unity objects have been destroyed
+        /// (e.g., during a scene transition). Uses Unity's overloaded == operator
+        /// which returns true for destroyed native objects.
+        /// Protected virtual so tests can override.
+        /// </summary>
+        protected virtual bool IsUnityObjectDestroyed()
+        {
+            return _gameObject == null || _source == null;
+        }
+
+        /// <summary>
+        /// Ensures Unity objects exist, recreating them if they were destroyed
+        /// during a scene transition while _created was still true.
+        /// </summary>
+        private void EnsureCreated()
+        {
+            if (_created && IsUnityObjectDestroyed())
+            {
+                // Unity destroyed our objects during a scene transition.
+                // Reset state and recreate.
+                _gameObject = null;
+                _source = null;
+                _created = false;
+            }
+
+            if (!_created)
+            {
+                CreateUnityObjects();
+                _created = true;
+            }
         }
     }
 }

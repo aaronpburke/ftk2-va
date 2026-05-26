@@ -15,10 +15,13 @@ namespace FTK2VoiceActing.Tests
         public int StopUnityPlaybackCalls { get; private set; }
         public int PlayUnityClipCalls { get; private set; }
         public bool SimulateIsPlaying { get; set; }
+        public bool SimulateUnityObjectDestroyed { get; set; }
+        public int CreateCallCount { get; private set; }
 
         protected override void CreateUnityObjects()
         {
             UnityObjectsCreated = true;
+            CreateCallCount++;
         }
 
         protected override void DestroyUnityObjects()
@@ -41,6 +44,11 @@ namespace FTK2VoiceActing.Tests
         protected override bool GetIsPlaying()
         {
             return SimulateIsPlaying;
+        }
+
+        protected override bool IsUnityObjectDestroyed()
+        {
+            return SimulateUnityObjectDestroyed;
         }
     }
 
@@ -190,12 +198,14 @@ namespace FTK2VoiceActing.Tests
         }
 
         [Test]
-        public void Play_ReturnsFalse_WhenNotReady()
+        public void Play_AutoCreates_WhenNotReady()
         {
             var handle = new TestableAudioPlaybackHandle();
             bool result = handle.Play(CreateUninitializedAudioClip(), 1.0f, 0);
-            Assert.IsFalse(result);
-            Assert.AreEqual(0, handle.PlayUnityClipCalls);
+            // Play now auto-creates Unity objects if they don't exist
+            Assert.IsTrue(result);
+            Assert.AreEqual(1, handle.PlayUnityClipCalls);
+            Assert.IsTrue(handle.UnityObjectsCreated);
         }
 
         [Test]
@@ -341,6 +351,59 @@ namespace FTK2VoiceActing.Tests
 
             // The original request generation is now stale
             Assert.IsFalse(handle.IsCurrentGeneration(requestGen));
+        }
+
+        // --- Auto-recreation after Unity destroy ---
+
+        [Test]
+        public void Play_RecreatesUnityObjects_WhenDestroyedBySceneTransition()
+        {
+            var handle = new RecreatingTestHandle();
+            handle.Create();
+            Assert.AreEqual(1, handle.CreateCallCount);
+
+            // Simulate Unity destroying objects during scene transition, then recovery on recreate
+            handle.SimulateDestroyedOnce = true;
+            bool result = handle.Play(CreateUninitializedAudioClip(), 1.0f, handle.Generation);
+            Assert.IsTrue(result);
+            Assert.AreEqual(2, handle.CreateCallCount); // Recreated
+            Assert.AreEqual(1, handle.PlayUnityClipCalls);
+        }
+
+        [Test]
+        public void IsReady_ReturnsFalse_WhenUnityObjectsDestroyed()
+        {
+            var handle = new TestableAudioPlaybackHandle();
+            handle.Create();
+            Assert.IsTrue(handle.IsReady);
+
+            handle.SimulateUnityObjectDestroyed = true;
+            Assert.IsFalse(handle.IsReady);
+        }
+    }
+
+    /// <summary>
+    /// Test handle that simulates Unity destroying objects once, then recovering
+    /// after recreation (mimicking a scene transition scenario).
+    /// </summary>
+    internal class RecreatingTestHandle : TestableAudioPlaybackHandle
+    {
+        public bool SimulateDestroyedOnce { get; set; }
+        private int _createCount;
+
+        protected override bool IsUnityObjectDestroyed()
+        {
+            // Only report destroyed when SimulateDestroyedOnce is true and
+            // we haven't recreated since it was set
+            if (SimulateDestroyedOnce && _createCount <= 1)
+                return true;
+            return false;
+        }
+
+        protected override void CreateUnityObjects()
+        {
+            base.CreateUnityObjects();
+            _createCount++;
         }
     }
 }
