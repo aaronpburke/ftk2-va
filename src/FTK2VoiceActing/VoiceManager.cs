@@ -231,11 +231,8 @@ namespace FTK2VoiceActing
 
         private void LoadAndPlayClip(string filePath, int playbackGeneration)
         {
-            if (!_handle.IsReady)
-            {
-                _logger.LogError("AudioSource not initialized. Call Initialize() first.");
-                return;
-            }
+            // No IsReady check here — Play() auto-recreates Unity objects
+            // if they were destroyed during a scene transition.
 
             AudioType audioType = GetAudioType(filePath);
             string fileUri = "file:///" + filePath.Replace('\\', '/');
