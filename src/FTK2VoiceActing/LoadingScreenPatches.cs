@@ -57,13 +57,11 @@ namespace FTK2VoiceActing
         /// </summary>
         internal static void InitializePostfix(string pAdventureID)
         {
-            Plugin.Log?.LogInfo($"[LoadingScreen] InitializePostfix called with adventureID: '{pAdventureID}'");
-
             if (VoiceManager == null || string.IsNullOrEmpty(pAdventureID))
                 return;
 
             string dialogueKey = GetNarratorKey(pAdventureID);
-            Plugin.Log?.LogInfo($"[LoadingScreen] Playing narrator clip: {NarratorNpcId}/{dialogueKey}");
+            Plugin.Log?.LogDebug($"[LoadingScreen] Playing narrator clip: {NarratorNpcId}/{dialogueKey}");
             VoiceManager.PlayVoiceClip(NarratorNpcId, dialogueKey);
         }
 
@@ -73,7 +71,6 @@ namespace FTK2VoiceActing
         /// </summary>
         internal static void HidePrefix()
         {
-            Plugin.Log?.LogInfo("[LoadingScreen] HidePrefix called");
             VoiceManager?.StopCurrentClip();
         }
 

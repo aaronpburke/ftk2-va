@@ -66,7 +66,6 @@ namespace FTK2VoiceActing
         /// </summary>
         internal static void RenderEmitterPrefix(string pValue, bool pDoTranslate)
         {
-            Plugin.Log?.LogInfo($"[Dialogue] RenderEmitterPrefix: pValue='{pValue}', pDoTranslate={pDoTranslate}");
             if (!string.IsNullOrEmpty(pValue))
             {
                 // When pDoTranslate is true, pValue is the raw NPC ID (e.g., "NPC_BARMAID")
@@ -99,7 +98,7 @@ namespace FTK2VoiceActing
             // Try direct match first (pValue might be a raw dialogue key)
             if (VoiceManager.HasVoiceClip(emitter, pValue))
             {
-                Plugin.Log?.LogInfo($"[Dialogue] Direct key match: {emitter}/{pValue}");
+                Plugin.Log?.LogDebug($"[Dialogue] Direct key match: {emitter}/{pValue}");
                 VoiceManager.PlayVoiceClip(emitter, pValue);
                 return;
             }
@@ -110,7 +109,7 @@ namespace FTK2VoiceActing
             string matchedKey = VoiceManager.FindKeyByTranslatedText(emitter, pValue);
             if (matchedKey != null)
             {
-                Plugin.Log?.LogInfo($"[Dialogue] Reverse translation match: {emitter}/{matchedKey}");
+                Plugin.Log?.LogDebug($"[Dialogue] Reverse translation match: {emitter}/{matchedKey}");
                 VoiceManager.PlayVoiceClip(emitter, matchedKey);
                 return;
             }
