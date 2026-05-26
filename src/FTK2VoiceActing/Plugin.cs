@@ -23,6 +23,7 @@ namespace FTK2VoiceActing
         internal static VoiceManager VoiceManager { get; private set; }
 
         private Harmony _harmony;
+        private bool _quitting;
 
         private void Awake()
         {
@@ -49,12 +50,24 @@ namespace FTK2VoiceActing
 
         private void OnDestroy()
         {
+            // Guard: do not tear down during scene transitions.
+            // Unity may call OnDestroy on MonoBehaviours attached to
+            // DontDestroyOnLoad objects during the initial scene load.
+            // Only clean up when the application is actually quitting.
+            if (!_quitting)
+                return;
+
             _harmony?.UnpatchSelf();
             VoiceManager?.Destroy();
             DialoguePatches.Reset();
             LoadingScreenPatches.Reset();
 
             Log?.LogInfo($"{PluginName} unloaded.");
+        }
+
+        private void OnApplicationQuit()
+        {
+            _quitting = true;
         }
     }
 }
