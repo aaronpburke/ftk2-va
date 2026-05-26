@@ -6,16 +6,28 @@ This document captures hard-won knowledge for any AI agent working on this codeb
 
 | Item | Value |
 |---|---|
-| Framework | BepInEx 5.4.x (Mono backend) |
-| Target | .NET Standard 2.1 |
-| Unity | 2022.3.41 |
+| Framework | BepInEx 5 (Mono backend); source project gets BepInEx from NuGet (`5.*`) |
+| Plugin target | .NET Standard 2.1 (`src/FTK2VoiceActing/FTK2VoiceActing.csproj`) |
+| Test target | .NET 8.0 (`tests/FTK2VoiceActing.Tests/FTK2VoiceActing.Tests.csproj`) |
+| Unity | 2022.3.41 (observed from game install) |
 | Game | For the King 2 (`For The King II.exe`) |
 | Solution | `FTK2VoiceActing.sln` |
 | Plugin GUID | `dev.ftk2.voiceacting` |
 | Decompiled source | External, at user's discretion (originally `D:\FTK2_Src`) |
-| Build | `dotnet build` (no restore needed after first time) |
+| Build | `dotnet build` (first build requires NuGet restore via `nuget.config`) |
 | Test | `dotnet test` — 111 NUnit tests, all must pass |
-| Deploy | Copy `src/.../bin/Debug/netstandard2.1/FTK2VoiceActing.dll` to game's `BepInEx/plugins/FTK2VoiceActing/` |
+| Deploy | Copy `src/.../bin/Debug/netstandard2.1/FTK2VoiceActing.dll` to game's `BepInEx\plugins\FTK2VoiceActing\` |
+
+## Build Prerequisites
+
+Building the solution has two dependency layers:
+
+1. **NuGet packages** — restored via feeds in `nuget.config` (`nuget.org` + `https://nuget.bepinex.dev/v3/index.json`). The source project gets BepInEx this way.
+2. **Manually copied DLLs** in `lib/` — Unity engine and game assemblies. See `lib/README.md` for the full list and a PowerShell copy command.
+
+The source project references game DLLs as `Private=false` (not copied to output). The test project references some DLLs with `Private=true` (copied for test runner).
+
+`Directory.Build.props` sets `LangVersion=latest` and `Nullable=disable` globally. The source project has `InternalsVisibleTo("FTK2VoiceActing.Tests")` so tests can access internal APIs.
 
 ## Architecture
 
@@ -38,15 +50,19 @@ Plugin.cs (BepInEx entry)
 
 ## Critical Game Behavior (Learned the Hard Way)
 
-### 1. SAY values are pre-translated
+### 1. SAY values arrive pre-translated at runtime (despite what the decompiled source suggests)
 
-The game's dialogue JSON has `"SAY": "STORY_1_1_VISIT_PRAN_PRE_DIALOG_1"` (a translation key), but by the time `DialogueViewHelper.RenderSay(pValue, pDoTranslate)` is called, `pValue` is **already the translated English text** (e.g., `"My, we haven't seen many adventurers..."`), even when `pDoTranslate=true`.
+**Decompiled source** shows `GameplayDirectorBase.ParseDialogueAction()` passing raw JSON strings to `RenderSay`, and `DialogueViewHelper.RenderSay()` calling `Lang.__dt(pValue)` internally when `pDoTranslate=true`. This suggests the Harmony prefix should see raw dialogue keys.
 
-**EMITTER values are NOT translated** — `pValue` is the raw NPC ID like `NPC_BARMAID`.
+**Observed runtime behavior** contradicts this: BepInEx logs confirmed that `RenderSayPrefix` receives `pValue='My, we haven't seen many adventurers in these parts for a spell.'` (translated English text), with `pDoTranslate=True`. The game appears to pre-translate SAY values somewhere upstream of `RenderSay` at runtime, possibly through a different code path than the decompiled source suggests.
 
-The mod handles this with a two-step lookup in `RenderSayPrefix`:
-1. Try direct key match (`HasVoiceClip(emitter, pValue)`) — works if pValue is somehow a raw key
+**EMITTER values are NOT translated** — `pValue` is the raw NPC ID like `NPC_BARMAID` (confirmed both in source and at runtime). Note: `REFLECTION_*` emitters are converted to display names with `pDoTranslate=false` (`GameplayDirectorBase.cs:1982-1988`); the mod intentionally ignores these.
+
+The mod handles both scenarios with a two-step lookup in `RenderSayPrefix`:
+1. Try direct key match (`HasVoiceClip(emitter, pValue)`) — works if pValue is a raw dialogue key
 2. Reverse-lookup via `VoiceManager.FindKeyByTranslatedText()` which calls `Lang.__dt(key)` on each indexed key for the NPC and compares the result to the received text
+
+**Important:** If you investigate this further, check the runtime logs — don't trust the decompiled source alone for the SAY path. The two-step lookup exists precisely because both paths are possible.
 
 ### 2. Unity destroys DontDestroyOnLoad objects during scene transitions
 
@@ -81,16 +97,19 @@ This prevents race conditions when dialogue advances faster than audio loads.
 - Unity's `AudioClip`/`AudioSource` constructors invoke native code → `SecurityException` in .NET 8 test runner
 - Use `RuntimeHelpers.GetUninitializedObject(typeof(AudioClip))` to create a non-null `AudioClip` without invoking the constructor — only for passing null checks, never access its members
 - `ReferenceEquals(clip, null)` is used instead of `clip == null` to avoid Unity's overloaded `==` operator which invokes native code
-- All 5 Unity-facing methods in `AudioPlaybackHandle` are `protected virtual` for test overriding
+- All 6 Unity-facing methods in `AudioPlaybackHandle` are `protected virtual` for test overriding: `CreateUnityObjects`, `DestroyUnityObjects`, `StopUnityPlayback`, `PlayUnityClip`, `GetIsPlaying`, `IsUnityObjectDestroyed`
 
 ## External Assembly References
 
-The `lib/` folder must be populated manually with DLLs from the game installation. See `lib/README.md` for the full list. These are reference-only (`Private=false`) — not copied to output.
+The source project gets BepInEx from **NuGet** (via `nuget.config`). All other game/Unity assemblies come from the `lib/` folder, populated manually from the game installation. See `lib/README.md` for the full list.
 
-Required assemblies:
-- `BepInEx.dll`, `0Harmony.dll` — from `BepInEx/core/`
+Source project references (`Private=false`, not copied to output):
 - `UnityEngine.dll`, `UnityEngine.CoreModule.dll`, `UnityEngine.AudioModule.dll`, `UnityEngine.UIElementsModule.dll`, `UnityEngine.UnityWebRequestAudioModule.dll`, `UnityEngine.UnityWebRequestModule.dll` — from game's `Managed/`
 - `FTK2.dll` — from game's `Managed/` (contains `DialogueViewHelper`, `LoadingScreenViewHelper`, `Lang`)
+
+Test project references (`Private=true`, copied for test runner):
+- `BepInEx.dll`, `0Harmony.dll` — from `lib/` (BepInEx core)
+- Select Unity DLLs — from `lib/`
 
 ## File Layout at Runtime
 
@@ -107,6 +126,23 @@ Required assemblies:
 
 The plugin auto-discovers its own directory via `Path.GetDirectoryName(Info.Location)`. No hardcoded paths.
 
+## Voice Asset Lookup Rules
+
+- Only files in the exact layout `VoiceAssets\<NPC_ID>\<DIALOGUE_KEY>.ogg|.wav` are indexed
+- Files placed directly under `VoiceAssets\` root are ignored
+- Nested subfolders under an NPC folder are also ignored
+- Lookup is **case-insensitive** for both NPC IDs and dialogue keys (`StringTupleComparer.OrdinalIgnoreCase`)
+- When both `.ogg` and `.wav` exist for the same key, `.ogg` wins (priority ordering)
+- Missing voice files are logged once per `(npcId, dialogueKey)` pair via `_warnedMissingKeys` to avoid log spam
+- `FindKeyByTranslatedText()` only searches keys already present in `_voiceFileIndex` — it is not a global dialogue search
+
+## Runtime Behavior Notes
+
+- When `Enabled=false`, `PlayVoiceClip()` still calls `StopCurrentClip()` to immediately silence current playback and invalidate any in-flight async load that started while enabled
+- Async load callbacks always dispose their `UnityWebRequest` on every code path
+- Stale-generation clips (where dialogue advanced during loading) are explicitly destroyed to avoid leaking orphan `AudioClip` instances
+- `RenderSayPrefix` calls `StopCurrentClip()` unconditionally, then `PlayVoiceClip()` calls it again if a match is found — the double-stop is harmless (second is a no-op) and ensures correctness
+
 ## Common Pitfalls
 
 1. **Don't add an `IsReady` guard before async audio loading** — `Play()` handles recreation
@@ -115,7 +151,7 @@ The plugin auto-discovers its own directory via `Path.GetDirectoryName(Info.Loca
 4. **Don't assume `_created` means objects are alive** — always check via `IsUnityObjectDestroyed()`
 5. **Don't forget to stop audio on SAY** — every `RenderSayPrefix` must stop the previous clip unconditionally
 6. **Don't commit files to `VoiceAssets_Template/`** — `.gitignore` excludes `.ogg`, `.wav`, and generated CSVs
-7. **Don't add direct project references to the game source** — all game types come from `lib/*.dll`
+7. **Don't add direct project references to the game source** — game types come from `lib/*.dll`; BepInEx comes from NuGet
 
 ## Useful Decompiled Source Files
 
@@ -133,12 +169,24 @@ If you have access to the decompiled game source:
 
 ## Build / Test / Deploy Cycle
 
-```bash
+```powershell
 dotnet build --no-restore                    # Build (< 2 seconds)
 dotnet test --no-build                       # Test (< 1 second, 111 tests)
+
 # Deploy:
-cp src/FTK2VoiceActing/bin/Debug/netstandard2.1/FTK2VoiceActing.dll \
-   "<game>/BepInEx/plugins/FTK2VoiceActing/"
+Copy-Item "src\FTK2VoiceActing\bin\Debug\netstandard2.1\FTK2VoiceActing.dll" `
+    "<game>\BepInEx\plugins\FTK2VoiceActing\" -Force
+
 # Check logs after running game:
-cat "<game>/BepInEx/LogOutput.log" | grep "FTK2 Voice Acting"
+Select-String "FTK2 Voice Acting" "<game>\BepInEx\LogOutput.log"
 ```
+
+## Test Conventions
+
+- Tests use `InternalsVisibleTo("FTK2VoiceActing.Tests")` to access internal APIs
+- `TestableAudioPlaybackHandle` subclasses `AudioPlaybackHandle` — override all 6 virtual methods to avoid Unity native API calls
+- `RecreatingTestHandle` extends `TestableAudioPlaybackHandle` for scene-transition simulation
+- `FakeVoicePlayback` implements `IVoicePlayback` with call counters and configurable clip/translation data
+- `RuntimeHelpers.GetUninitializedObject(typeof(AudioClip))` creates non-null `AudioClip` references without invoking Unity constructors — never access their members
+- Static patch state (`DialoguePatches.CurrentEmitter`, `VoiceManager` references) must be reset in `[SetUp]`/`[TearDown]`
+- Temp directories are used for file-system tests and cleaned up in `[TearDown]`
